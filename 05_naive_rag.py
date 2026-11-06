@@ -33,22 +33,28 @@ def cosine_similarity(a: list[float], b: list[float]) -> float:
 # 모든 조각을 미리 벡터로 바꿔 저장한다 (이게 "벡터 저장소"의 정체다)
 index = [(chunk, embed(chunk)) for chunk in chunks]
 
-def retrieve(question: str, top_k: int = 2) -> list[str]:
+def retrieve(question: str, top_k: int = 2, threshold: float = 0.7) -> list[str]:
     # 2. 검색: 질문과 가장 비슷한 조각 top_k개를 찾는다.
     q_vec = embed(question)
     scored = [(cosine_similarity(q_vec, vec), chunk) for chunk, vec in index]
+    scored.sort(reverse=True) # 내림차순 정렬
+
+    # 기준값 이상인 것만 남긴다 (출력과 반환 모두에 적용)
+    selected = [(score, chunk) for score, chunk in scored[:top_k] if score > threshold]
+
     # 검색 결과를 눈으로 확인할 수 있게 점수도 출력한다
-    for score, chunk in scored[:top_k]:
-        # 기준값을 0.6으로 설정하고, 유사도가 이보다 낮으면 버리기
-        if score < 0.6:
-            continue
+    for score, chunk in selected:
         print(f"    [유사도 {score:.3f}] {chunk[:30]}")
-    return [chunk for _, chunk in scored[:top_k]]
+    if not selected:
+        print("    (기준을 넘는 조각 없음)")
+    return [chunk for score, chunk in selected]
 
 def rag_answer(question: str) -> str:
     """3. 생성: 찾은 조각만 붙여서 LLM에게 답하게 한다."""
     print(f"\n질문: {question}")
     found = retrieve(question)
+    if not found:
+        return "FAQ에 없는 내용입니다."
     context = "\n".join(found)
     system = f"""너는 학교 FAQ 안내 챗봇이다.
 아래 [참고 자료]만 근거로 답해라.
