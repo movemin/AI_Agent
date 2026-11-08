@@ -3,6 +3,11 @@ import re  # 찾기 및 바꾸기 기능
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+import requests
+
+
+# 안키 서버 주소
+url = 'http://localhost:8765'
 
 load_dotenv()
 
@@ -22,53 +27,64 @@ system = f"""
 4. {JLPT}의 레벨과 {TARGET}의 목적에 맞게 번역해라.
 """
 
-chat_session = client.chats.create(
-    model=MODEL_NAME,
-    config=types.GenerateContentConfig(system_instruction=system)
-)
+# chat_session = client.chats.create(
+#     model=MODEL_NAME,
+#     config=types.GenerateContentConfig(system_instruction=system)
+# )
 
-def clean_srt(srt_text: str) -> list:
-    """SRT에서 시간 태그를 지우고 순수 텍스트를 리스트로 반환합니다."""
-    text = re.sub(r'^\d+\s*\n\d{2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{2}:\d{2}:\d{2},\d{3}\s*\n', '', srt_text, flags=re.MULTILINE)
-    text = re.sub(r'<[^>]+>', '', text)
-    return [line.strip() for line in text.split('\n') if line.strip()]
+# def clean_srt(srt_text: str) -> list:
+#     """SRT에서 시간 태그를 지우고 순수 텍스트를 리스트로 반환합니다."""
+#     text = re.sub(r'^\d+\s*\n\d{2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{2}:\d{2}:\d{2},\d{3}\s*\n', '', srt_text, flags=re.MULTILINE)
+#     text = re.sub(r'<[^>]+>', '', text)
+#     return [line.strip() for line in text.split('\n') if line.strip()]
 
-def process_in_chunks(lines: list, chunk_size: int = 50):
-    """자막을 50줄씩 쪼개서 번역하고 즉시 파일에 이어붙여 씁니다."""
-    total_chunks = (len(lines) + chunk_size - 1) // chunk_size
-    output_filename = "output.txt"
-    
-    if os.path.exists(output_filename):
-        os.remove(output_filename)
 
-    print(f"총 {len(lines)}줄의 자막을 {total_chunks}번으로 나누어 처리를 시작합니다...\n")
+# # --- 실행부 ---
+# print("1. 파일을 읽고 있습니다.")
+with open("output.txt", "r", encoding="utf-8") as file:  # metante.srt
+    raw_subtitle = file.read()
 
-    for i in range(total_chunks):
-        chunk_lines = lines[i * chunk_size : (i + 1) * chunk_size]
-        chunk_text = "\n".join(chunk_lines)
-        
-        print(f"[{i+1}/{total_chunks}] 파트 변환 중... ", end="", flush=True)
-        
-        try:
-            response = chat_session.send_message(chunk_text)
-            result = response.text.strip()
-            
-            with open(output_filename, "a", encoding="utf-8") as output_file:
-                output_file.write(result + "\n")
-            
-            print("완료!")
-        except Exception as e:
-            print(f"오류 발생: {e}")
-            
-    print(f"\n[안내] 파일 작성이 완료되었습니다. '{output_filename}'을 확인하세요.")
+print("2. 자막의 숫자와 시간을 지우는 중입니다 (전처리).")
+# cleaned_lines = clean_srt(raw_subtitle)
 
-# --- 실행부 ---
-print("파일을 읽고 있습니다.")
-with open("metante.srt", "r", encoding="utf-8") as file:
-    raw_subtitle = file.read() 
+# print("3. AI에게 한 번에 번역을 요청합니다. 시간이 조금 걸릴 수 있습니다.")
+# response = chat_session.send_message(raw_subtitle)
+# result = response.text.strip()
 
-print("AI 분석 및 전처리가 시작되었습니다.")
-cleaned_lines = clean_srt(raw_subtitle)
+# print("4. 변환 완료! .txt 파일로 저장합니다.")
+# with open("output.txt", "w", encoding="utf-8") as output_file:
+#     output_file.write(result)
 
-# 청킹 및 변환 실행
-process_in_chunks(cleaned_lines, chunk_size=50)
+# print("[안내] 모든 작업이 끝났습니다. output.txt 파일을 확인하세요.")
+
+for card in raw_subtitle.split('\n'):  # 반복 대상 나중에 바꾸기
+    result = card.split("\t")
+    payload = {
+        "action": "addNote",
+        "version": 6,
+        "params": {
+            "note": {
+                "deckName": "명탐정 코난 실험",
+                "modelName": "명탐정 코난",  # 영문판 안키를 쓰신다면 "Basic"
+                "fields": {
+                    "예문(일본어)": result[0].strip(),
+                    "예문(한국어)": result[-1].strip()
+                },
+                "options": {
+                    "allowDuplicate": False  # 중복된 카드가 있으면 안키가 알아서 추가를 거부하게 만듭니다.
+                },
+                "tags": [
+                    "자막변환", "파이썬자동화"  # 안키에서 카드를 쉽게 찾기 위한 태그 (선택 사항)
+                ]
+            }
+        }
+    }
+    response = requests.post(url, json=payload).json()
+    # 안키 서버가 에러를 뱉었는지 확인
+    if response.get("error"):
+        print(f"❌ 실패 [{result[0][:10]}...]: {response['error']}")
+    else:
+        print(f"✅ 성공 [{result[0][:10]}...]")
+
+
+# print(response)
