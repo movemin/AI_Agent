@@ -1,5 +1,10 @@
 .env
 venv/
+.venv
+env/
+ENV/
+env.bak/
+venv.bak
 .vscode
 settions.json
 test
