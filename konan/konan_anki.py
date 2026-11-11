@@ -39,8 +39,8 @@ def clean_srt(srt_text: str) -> list:
     return [line.strip() for line in text.split('\n') if line.strip()]
 
 
-# # --- 실행부 ---
-# print("1. 파일을 읽고 있습니다.")
+# --- 실행부 ---
+print("1. 파일을 읽고 있습니다.")
 with open("input.txt", "r", encoding="utf-8") as file:  # metante.srt
     raw_subtitle = file.read()
 
@@ -58,7 +58,7 @@ with open("output.txt", "w", encoding="utf-8") as output_file:
 print("[안내] 모든 작업이 끝났습니다. output.txt 파일을 확인하세요.")
 
 for card in result.split('\n'):  # 반복 대상 나중에 바꾸기
-    korea, japan = card.split("\t", 1)
+    japan, korea = card.split("\t", 1)
     payload = {
         "action": "addNote",
         "version": 6,
