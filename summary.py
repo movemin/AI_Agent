@@ -42,7 +42,7 @@ def summarize_txt(file_path: str):
     return response.choices[0].message.content
 
 if __name__ == '__main__':
-    file_path = './chap04/output/AI-Agents-ko.txt'
+    file_path = "./chap04/output/AI-Agents-ko_with_preprocessing.txt"
 
     summary = summarize_txt(file_path)
     print(summary)
