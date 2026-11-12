@@ -45,4 +45,4 @@ txt_file_path = f"chap04/output/{pdf_file_name}_with_preprocessing.txt"
 
 # 텍스트를 뽑아 변수에 저장한 경로에 작성
 with open(txt_file_path, 'w', encoding='utf-8') as f:
-    f.write(full_text)
+    f.write(full_text) 

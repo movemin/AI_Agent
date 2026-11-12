@@ -38,7 +38,7 @@ def summarize_txt(file_path: str):
             {"role": "system", "content": system_prompt},
         ]
     )
-
+    
     return response.choices[0].message.content
 
 if __name__ == '__main__':

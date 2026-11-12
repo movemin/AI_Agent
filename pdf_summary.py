@@ -9,16 +9,24 @@ api_key = os.getenv('CHATGPT_API_KEY')
 def pdf_to_text(pdf_file_path: str):
     doc = pymupdf.open(pdf_file_path)
 
-    header_height = 80
-    footer_height = 80
+    # 헤더와 푸터 설정
+    header_height = 65
+    footer_height = 55
 
     full_text = ''
 
     for page in doc:
+
+        # 현재 페이지에 대한 크기와 좌표 정보를 담고 있는 객체
         rect = page.rect
 
+        # 헤더만 추출
         header = page.get_text(clip = (0, 0, rect.width, header_height))
+
+        # 푸터만 추출
         footer = page.get_text(clip = (0, rect.height - footer_height, rect.width, rect.height))
+        
+        # 헤더와 푸터를 제외한 텍스트 추출
         text = page.get_text(clip = (0, header_height, rect.width, rect.height - footer_height))
 
         full_text += text + '\n---------------------------------------------------\n'
