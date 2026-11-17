@@ -13,7 +13,8 @@ with st.sidebar:
     "[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/streamlit/llm-examples?quickstart=1)"
     "[Chat GPT OpenAI API key 발급](https://platform.openai.com/account/api-keys)"
     "[소스 코드](https://github.com/streamlit/llm-examples/blob/main/Chatbot.py)"
-    "[PyMuPDF 가이드 문서 웹 페이지](https://pypi.org/project/PyMuPDF)"
+    "[PyMuPDF 가이드 문서 웹 페이지](https://pypi.org/project/PyMuPDF)" 
+    "[뉴스 요약 AI](https://kyeong-web-summarizer.streamlit.app/)"
 
 
 # 모델 설정
