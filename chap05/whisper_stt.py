@@ -1,17 +1,17 @@
+# 필요한 라이브러리들을 05-2절에서 만든 코드에서 가져와 임포트합니다.
 import os
 import torch
 import pandas as pd
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
+from pyannote.audio import Pipeline
 
 
 # 자신이 설치한 위치 환경변수 등록
 os.environ["PATH"] += os.pathsep + r"~/home/movemin/myproject/ffmpeg-2026-11-11-git-23c4540053-full_build"
 
-def whisper_stt(
-    audio_file_path: str,
-    output_file_path: str = "./output.csv"
-):
-    """받아쓰기 기능"""
+# 받아쓰기 기능
+def whisper_stt(audio_file_path: str, output_file_path: str = "./output.csv"):
+    """음성 파일 경로를 넣으면 결과가 output_file_path에 CSV 형식으로 저장됩니다."""
     
     # GPU 사용 가능 여부 확인
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -52,8 +52,9 @@ def whisper_stt(
 
     return result, df
 
+# 판다스 데이터프레임 형태로 저장하는 기능
 def whisper_to_dataframe(result, output_file_path):
-    """판다스 데이터프레임 형태로 저장하는 기능"""
+    """위스퍼 모델을 이용해 얻은 결과를 CSV 파일로 저장"""
 
     # chunk를 CVS 파일로 저장
     start_end_text = []
@@ -69,10 +70,73 @@ def whisper_to_dataframe(result, output_file_path):
 
     return df
 
-if __name__ == '__main__':
-    result, df = whisper_stt(
-        "./chap05/audio/싼기타_비싼기타.mp3",
-        "./chap05/audio/싼기타_비싼기타.csv",
+# 매개변수로 입출력할 파일 경로 추가
+def speaker_diarization(audio_file_path: str, output_rttm_file_path: str, output_csv_file_path: str):
+    
+    pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-community-1", token = os.getenv("gpt-text-to-image"))
+
+    # CUDA를 사용할 수 있다면 CUDA를 사용하도록 설정
+    if torch.cuda.is_available():
+        pipeline.to(torch.device("cuda"))
+        print('cuda is available')
+    else:
+        print('cuda is not available')
+    diarization_pipeline = pipeline(audio_file_path)   # 여러 파이프라인이 있으므로 가독성을 높이기 위해 pipeline -> diarization_pipeline
+
+    # dump the diarization output to disk using RTTM format
+    with open(output_rttm_file_path, "w", encoding='utf-8') as rttm:
+        diarization_pipeline.speaker_diarization.write_rttm(rttm)
+
+    # 판다스 데이터프레임으로 변환
+    df_rttm = pd.read_csv(
+        output_rttm_file_path,
+        sep = ' ',
+        header = None,
+        names = ['type', 'file', 'chnl', 'start', 'duration', 'C1', 'C2', 'speaker_id', 'C3', 'C4']
+        )
+
+    df_rttm['end'] = df_rttm['start'] + df_rttm['duration']
+
+    # speaker_id를 기반으로 화자별로 구간 나누기
+    df_rttm["number"] = None
+    df_rttm.at[0, "number"] = 0
+
+    for i in range(1, len(df_rttm)):
+        if df_rttm.at[i, "speaker_id"] != df_rttm.at[i - 1, "speaker_id"]:
+            df_rttm.at[i, "number"] = df_rttm.at[i - 1, "number"] + 1
+        else:
+            df_rttm.at[i, "number"] = df_rttm.at[i - 1, "number"]
+
+    df_rttm_grouped = df_rttm.groupby("number").agg(
+        start = pd.NamedAgg(column = 'start', aggfunc = 'min'),
+        end = pd.NamedAgg(column = 'end', aggfunc = 'max'),
+        speaker_id = pd.NamedAgg(column = 'speaker_id', aggfunc = 'first')
     )
 
-    print(df)
+    df_rttm_grouped["duration"] = df_rttm_grouped["end"] - df_rttm_grouped["start"]
+
+    df_rttm_grouped.to_csv(
+        output_csv_file_path,
+        index = False,  # 인덱스는 저장하지 않음
+        encoding = 'utf-8'
+    )
+    return df_rttm_grouped
+
+
+if __name__ == '__main__':
+    audio_file_path = "./chap05/audio/싼기타_비싼기타.wav"
+    stt_output_file_path = "./chap05/audio/싼기타_비싼기타.csv"
+    rttm_file_path = "./chap05/audio/싼기타_비싼기타.rttm"
+    rttm_csv_file_path = "./chap05/audio/싼기타_비싼기타_rttm.csv"
+    
+    # result, df = whisper_stt(
+    #     "./chap05/audio/싼기타_비싼기타.mp3",
+    #     "./chap05/audio/싼기타_비싼기타.csv",
+    # )
+
+    df_rttm = speaker_diarization(
+        audio_file_path,
+        rttm_file_path,
+        rttm_csv_file_path
+    )
+    print(df_rttm)
