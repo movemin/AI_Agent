@@ -122,21 +122,78 @@ def speaker_diarization(audio_file_path: str, output_rttm_file_path: str, output
     )
     return df_rttm_grouped
 
+# 시간대별로 화자가 분리된 결과에 STT 결과 텍스트 할당하기
+def stt_to_rttm(
+    audio_file_path: str,
+    stt_output_file_path: str,
+    rttm_file_path: str,
+    rttm_csv_file_path: str,
+    final_output_csv_file_path: str
+    ):
 
-if __name__ == '__main__':
-    audio_file_path = "./chap05/audio/싼기타_비싼기타.wav"
-    stt_output_file_path = "./chap05/audio/싼기타_비싼기타.csv"
-    rttm_file_path = "./chap05/audio/싼기타_비싼기타.rttm"
-    rttm_csv_file_path = "./chap05/audio/싼기타_비싼기타_rttm.csv"
-    
-    # result, df = whisper_stt(
-    #     "./chap05/audio/싼기타_비싼기타.mp3",
-    #     "./chap05/audio/싼기타_비싼기타.csv",
-    # )
+    # stt_to_rttm 함수는 whisper_stt 함수와 speaker_diarization 함수를 실행하여 결과를 받아 옵니다.
+    result, df_stt = whisper_stt(
+        audio_file_path,
+        stt_output_file_path
+    )
 
     df_rttm = speaker_diarization(
         audio_file_path,
         rttm_file_path,
         rttm_csv_file_path
     )
+
+    df_rttm["text"] = ""  # 그 후 가져온 시간대별로 어느 화자가 발언했는지 정리된 df_rttm에 "text"라는 빈 열을 추가하고 위스퍼 모델로 받아쓴 텍스트를 채웁니다. 중요한 부분은 적절한 행 찾기
+
+    for i_stt, row_stt in df_stt.iterrows():
+        overlap_dict = {}
+        for i_rttm, row_rttm in df_rttm.iterrows():
+
+            # df_stt행과 df_rttm 행이 겹치는 시간을 각각 계산해서 가장 많이 겹치는 행에 텍스트를 추가
+            # ex) 겹치는 시간이 0초라면 해당 문장을 건너뜁니다.
+            overlap = max(0, min(row_stt["end"], row_rttm["end"]) - max(row_stt["start"], row_rttm["start"]))
+            overlap_dict[i_rttm] = overlap
+
+        max_overlap = max(overlap_dict.values())
+        max_overlap_idx = max(overlap_dict, key = overlap_dict.get)
+
+        if max_overlap > 0:
+            df_rttm.at[max_overlap_idx, "text"] += row_stt["text"] + "\n"
+
+    # 결과는 지정된 결로에 저장됩니다.
+    df_rttm.to_csv(
+        final_output_csv_file_path,
+        index = False,  # 인덱스는 저장하지 않음
+        sep = '|',
+        encoding = 'utf-8'
+    )
+    return df_rttm
+
+if __name__ == '__main__':
+    audio_file_path = "./chap05/audio/싼기타_비싼기타.wav"
+    stt_output_file_path = "./chap05/audio/싼기타_비싼기타.csv"
+    rttm_file_path = "./chap05/audio/싼기타_비싼기타.rttm"
+    rttm_csv_file_path = "./chap05/audio/싼기타_비싼기타_rttm.csv"
+    final_csv_file_path = "./chap05/audio/싼기타_비싼기타_final.csv"
+    
+    # result, df = whisper_stt(
+    #     "./chap05/audio/싼기타_비싼기타.mp3",
+    #     "./chap05/audio/싼기타_비싼기타.csv",
+    # )
+
+    # df_rttm = speaker_diarization(
+    #     audio_file_path,
+    #     rttm_file_path,
+    #     rttm_csv_file_path
+    # )
+    # print(df_rttm)
+
+    df_rttm = stt_to_rttm(
+        audio_file_path,
+        stt_output_file_path,
+        rttm_file_path,
+        rttm_csv_file_path,
+        final_csv_file_path
+    )
+
     print(df_rttm)
